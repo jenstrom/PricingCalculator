@@ -13,6 +13,11 @@
     <PackageReference Include="Microsoft.Azure.Functions.Worker" Version="1.6.0" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\Models\PricingCalculator.Models.csproj" />
+    <ProjectReference Include="..\PricingCalculator.Calculation\PricingCalculator.Calculation.csproj" />
+    <ProjectReference Include="..\PricingCalculator.Data\PricingCalculator.Data.csproj" />
+  </ItemGroup>
+  <ItemGroup>
     <None Update="host.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
