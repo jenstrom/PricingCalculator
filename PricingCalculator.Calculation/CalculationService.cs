@@ -1,85 +1,54 @@
-﻿using Models;
-using PricingCalculator.Data;
+﻿using PricingCalculator.Data;
+using PricingCalculator.Data.Models;
 using PricingCalculator.Models;
+using PricingCalculator.Models.Calculation;
 
 namespace PricingCalculator.Calculation
 {
     public class CalculationService : ICalculationService
     {
-        private readonly IServiceRepository _serviceRepository;
+        private readonly IRepository _repository;
 
-        public CalculationService(IServiceRepository serviceRepository)
+        public CalculationService(IRepository repository)
         {
-            _serviceRepository = serviceRepository;
+            _repository = repository;
         }
 
-        public CalculationResponse Calculate(IEnumerable<CalculationRequest> requests)
+        public decimal Calculate(CalculationRequest request)
         {
-            if (requests == null || !requests.Any())
+            var customer = _repository.GetCustomer(request.CustomerId);
+            if (customer == null)
             {
-                throw new ArgumentException("Collection must not be null or empty", nameof(requests));
+                throw new ArgumentOutOfRangeException(nameof(request.CustomerId));
             }
-            if (!_serviceRepository.ServicesExist(requests.Select(r => r.ServiceName)))
+            var startDate = request.StartDate.Date.AddDays(customer.FreeDays);
+            var endDate = request.EndDate.Date;
+            if (startDate >= endDate)
             {
-                throw new ArgumentException("Collection contains invalid service name", nameof(requests));
+                return 0;
             }
-            var calculations = requests.Select(CalculateRequest).ToList();
-            return new CalculationResponse
+            return customer.Services.Where(s => s.Start.Date <= endDate).Select(s => new
             {
-                Calculations = calculations,
-                Total = calculations.Sum(c => c.Total)
-            };
+                ServiceDays = s.Service.DaysAvailable,
+                StartDate = s.Start.Date > startDate ? s.Start.Date : startDate,
+                Cost = customer.CustomPrices.FirstOrDefault(cp => cp.Service.Id == s.Service.Id)?.Price ?? s.Service.Cost,
+                ApplicableDiscounts = customer.Discounts
+                    .Where(
+                        d => d.Service.Id == s.Service.Id
+                        && d.Start.Date <= endDate && (d.End == null || d.End.Value.Date >= startDate))
+                    .OrderByDescending(d => d.PercentageDiscount)
+            }).SelectMany(x => GetDaysInRange(x.StartDate, endDate).Where(d => x.ServiceDays.Contains(d.DayOfWeek)).Select(
+                d => (100 - x.ApplicableDiscounts.FirstOrDefault(dis => DateIsInRange(d.Date, dis.Start.Date, dis.End?.Date))?.PercentageDiscount) * x.Cost / 100 ?? x.Cost)
+            ).Sum();
         }
 
-        private CalculationResult CalculateRequest(CalculationRequest request)
+        private bool DateIsInRange(DateTime date, DateTime start, DateTime? end) 
+            => date >= start && (end == null || date <= end.Value);
+
+        private IEnumerable<DateTime> GetDaysInRange(DateTime start, DateTime end)
         {
-            var applicableDiscounts = request.Discounts.Where(d => d.End > d.Start && d.End > request.StartDate && d.Start < request.EndDate);
-            var service = _serviceRepository.GetServiceModel(request.ServiceName);
-            var paidDays = GetNumberOfActiveDaysBetweenDates(request.StartDate, request.EndDate, service.DaysAvailable);
-
-
-            return new CalculationResult
-            {
-                Total = paidDays * service.Cost,
-                AppliedDiscounts = applicableDiscounts.ToList()
-            };
-        }
-
-        private void ApplyDiscounts(IEnumerable<Discount> discounts, int numberOfFullPaidDays, DateTime start, DateTime end)
-        {
-            var orderedDiscounts = discounts.OrderByDescending(d => d.PercentageDiscount).ToList();
-            for (int i = 0; i < orderedDiscounts.Count; i++)
-            {
-                var discount = orderedDiscounts[i];
-                var applicable = discount.Start <= discount.End && discount.Start <= end && discount.End > start;
-                if (applicable)
-                {
-                    var discountStart = discount.Start < start ? start : discount.Start;
-                    var discountEnd = discount.End > end ? end : discount.End;
-                    var betterDiscounts = discounts.Take(i).ToList();
-                    for (int j = 0; j < betterDiscounts.Count; j++)
-                    {
-                        var betterDiscount = betterDiscounts[j];
-
-                    }
-                }
-            }
-
-        }
-
-        private int GetNumberOfActiveDaysBetweenDates(DateTime start, DateTime end, IEnumerable<DayOfWeek> activeDays)
-        {
-            var looseDaysAtStart = (7 + (int)end.DayOfWeek - (int)start.DayOfWeek) % 7;
-            var numberOfFullWeeks = (end - start.AddDays(looseDaysAtStart)).Days / 7;
-            var paidDays = numberOfFullWeeks * activeDays.Count();
-            for (int i = 0; i < looseDaysAtStart; i++)
-            {
-                if (activeDays.Contains(start.AddDays(i).DayOfWeek))
-                {
-                    paidDays++;
-                }
-            }
-            return paidDays;
+            for (var day = start.Date; day.Date <= end.Date; day = day.AddDays(1))
+                yield return day;
         }
     }
 }

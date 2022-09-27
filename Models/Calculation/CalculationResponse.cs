@@ -1,11 +1,4 @@
-﻿using Models;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace PricingCalculator.Models
+﻿namespace PricingCalculator.Models.Calculation
 {
     public class CalculationResponse
     {
@@ -16,6 +9,5 @@ namespace PricingCalculator.Models
     public class CalculationResult
     {
         public decimal Total { get; set; }
-        public List<Discount> AppliedDiscounts { get; set; } = new();
     }
 }

@@ -39,6 +39,6 @@ internal class Program
     {
         services.AddLogging();
         services.AddTransient<ICalculationService, CalculationService>();
-        services.AddSingleton<IServiceRepository, ServiceRepository>();
+        services.AddSingleton<IRepository, Repository>();
     }
 }

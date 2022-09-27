@@ -3,226 +3,92 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
-using Models;
 using Moq;
 using PricingCalculator.Data;
 using PricingCalculator.Data.Models;
+using PricingCalculator.Models.Calculation;
 
 namespace PricingCalculator.Calculation.Tests.CalculationServiceTests
 {
     public class CalculateTests
     {
         private readonly CalculationService _sut;
-        private readonly List<ServiceModel> _services;
 
         public CalculateTests()
         {
-            IServiceRepository serviceRepository = Mock.Of<IServiceRepository>();
-            _services = new List<ServiceModel>
+            IRepository repository = Mock.Of<IRepository>();
+            Mock.Get(repository).Setup(x => x.GetCustomer(It.IsAny<int>())).Returns(new Customer
             {
-                new ServiceModel
+                Services = new List<CustomerServiceModel>
                 {
-                    Name = Guid.NewGuid().ToString(),
-                    Cost = 1,
-                    DaysAvailable = new List<DayOfWeek> { DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday, DayOfWeek.Thursday }
-                }
-            };
-            Mock.Get(serviceRepository).Setup(x => x.GetServices()).Returns(() => _services);
-            Mock.Get(serviceRepository).Setup(x => x.GetServiceModel(_services[0].Name)).Returns(() => _services[0]);
-            Mock.Get(serviceRepository).Setup(x => x.ServicesExist(It.IsAny<IEnumerable<string>>())).Returns(true);
-            _sut = new CalculationService(serviceRepository);
-        }
-
-        [Fact]
-        public void It_should_work_if_start_in_start_of_service_days()
-        {
-            var start = DateTime.ParseExact("2022-09-26", "yyyy-MM-dd", CultureInfo.InvariantCulture);
-            var end = start.AddDays(7);
-            var input = new List<CalculationRequest>
-            {
-                new CalculationRequest
-                {
-                    ServiceName = _services[0].Name,
-                    Discounts = new List<Discount>(),
-                    StartDate = start,
-                    EndDate = end
-                }
-            };
-            var expected = _services[0].Cost * _services[0].DaysAvailable.Count();
-            var result = _sut.Calculate(input);
-            Assert.Equal(expected, result.Total);
-        }
-
-        [Fact]
-        public void It_should_work_if_start_in_middle_of_service_days()
-        {
-            var start = DateTime.ParseExact("2022-09-28", "yyyy-MM-dd", CultureInfo.InvariantCulture);
-            var end = start.AddDays(7);
-            var input = new List<CalculationRequest>
-            {
-                new CalculationRequest
-                {
-                    ServiceName = _services[0].Name,
-                    Discounts = new List<Discount>(),
-                    StartDate = start,
-                    EndDate = end
-                }
-            };
-            var expected = _services[0].Cost * _services[0].DaysAvailable.Count();
-            var result = _sut.Calculate(input);
-            Assert.Equal(expected, result.Total);
-        }
-
-        [Fact]
-        public void It_should_work_if_start_after_service_days()
-        {
-            var start = DateTime.ParseExact("2022-09-30", "yyyy-MM-dd", CultureInfo.InvariantCulture);
-            var end = start.AddDays(7);
-            var input = new List<CalculationRequest>
-            {
-                new CalculationRequest
-                {
-                    ServiceName = _services[0].Name,
-                    Discounts = new List<Discount>(),
-                    StartDate = start,
-                    EndDate = end
-                }
-            };
-            var expected = _services[0].Cost * _services[0].DaysAvailable.Count();
-            var result = _sut.Calculate(input);
-            Assert.Equal(expected, result.Total);
-        }
-
-        [Fact]
-        public void It_should_work_if_span_is_several_weeks()
-        {
-            var weeks = 3;
-            var start = DateTime.ParseExact("2022-09-30", "yyyy-MM-dd", CultureInfo.InvariantCulture);
-            var end = start.AddDays(weeks * 7);
-            var input = new List<CalculationRequest>
-            {
-                new CalculationRequest
-                {
-                    ServiceName = _services[0].Name,
-                    Discounts = new List<Discount>(),
-                    StartDate = start,
-                    EndDate = end
-                }
-            };
-            var expected = _services[0].Cost * _services[0].DaysAvailable.Count() * weeks;
-            var result = _sut.Calculate(input);
-            Assert.Equal(expected, result.Total);
-        }
-
-        [Fact]
-        public void It_should_work_if_span_is_not_full_weeks_and_start_monday()
-        {
-            var weeks = 3;
-            var extraDays = 2;
-            var start = DateTime.ParseExact("2022-09-26", "yyyy-MM-dd", CultureInfo.InvariantCulture);
-            var end = start.AddDays(weeks * 7 + extraDays);
-            var input = new List<CalculationRequest>
-            {
-                new CalculationRequest
-                {
-                    ServiceName = _services[0].Name,
-                    Discounts = new List<Discount>(),
-                    StartDate = start,
-                    EndDate = end
-                }
-            };
-            var expected = _services[0].Cost * _services[0].DaysAvailable.Count() * weeks + extraDays;
-            var result = _sut.Calculate(input);
-            Assert.Equal(expected, result.Total);
-        }
-
-        [Fact]
-        public void It_should_work_if_span_is_not_full_weeks_and_start_after_service_days()
-        {
-            var weeks = 3;
-            var extraDays = 2;
-            var start = DateTime.ParseExact("2022-09-30", "yyyy-MM-dd", CultureInfo.InvariantCulture);
-            var end = start.AddDays(weeks * 7 + extraDays);
-            var input = new List<CalculationRequest>
-            {
-                new CalculationRequest
-                {
-                    ServiceName = _services[0].Name,
-                    Discounts = new List<Discount>(),
-                    StartDate = start,
-                    EndDate = end
-                }
-            };
-            var expected = _services[0].Cost * _services[0].DaysAvailable.Count() * weeks;
-            var result = _sut.Calculate(input);
-            Assert.Equal(expected, result.Total);
-        }
-
-        [Fact]
-        public void It_should_work_if_service_days_are_split_up()
-        {
-            _services[0].DaysAvailable = new List<DayOfWeek> { DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Friday, DayOfWeek.Saturday };
-            var weeks = 3;
-            var extraDays = 2;
-            var start = DateTime.ParseExact("2022-09-26", "yyyy-MM-dd", CultureInfo.InvariantCulture);
-            var end = start.AddDays(weeks * 7 + extraDays);
-            var input = new List<CalculationRequest>
-            {
-                new CalculationRequest
-                {
-                    ServiceName = _services[0].Name,
-                    Discounts = new List<Discount>(),
-                    StartDate = start,
-                    EndDate = end
-                }
-            };
-            var expected = _services[0].Cost * _services[0].DaysAvailable.Count() * weeks + extraDays;
-            var result = _sut.Calculate(input);
-            Assert.Equal(expected, result.Total);
-        }
-
-        [Fact]
-        public void It_should_return_a_list_of_applied_discounts()
-        {
-            var weeks = 3;
-            var start = DateTime.ParseExact("2022-09-26", "yyyy-MM-dd", CultureInfo.InvariantCulture);
-            var end = start.AddDays(weeks * 7);
-            var input = new List<CalculationRequest>
-            {
-                new CalculationRequest
-                {
-                    ServiceName = _services[0].Name,
-                    Discounts = new List<Discount>
+                    new CustomerServiceModel
                     {
-                        new Discount
+                        Start = DateTime.Now,
+                        Service = new ServiceModel
                         {
-                            Start = start.AddDays(-14),
-                            End = start.AddDays(-7),
-                            PercentageDiscount = 1
-                        },
-                        new Discount
+                            Id = 1,
+                            Cost = 1,
+                            DaysAvailable = new List<DayOfWeek> { DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday, DayOfWeek.Thursday, DayOfWeek.Friday, DayOfWeek.Saturday, DayOfWeek.Sunday }
+                        }
+                    }
+                },
+                Discounts = new List<Discount>
+                {
+                    new Discount
+                    {
+                        Start = DateTime.Now,
+                        End = DateTime.Now.AddDays(365),
+                        PercentageDiscount = 20,
+                        Service = new ServiceModel
                         {
-                            Start = start.AddDays(3),
-                            End = start.AddDays(10),
-                            PercentageDiscount = 2
-                        },
-                        new Discount
-                        {
-                            Start = start.AddDays(12),
-                            End = start.AddDays(20),
-                            PercentageDiscount = 3
+                            Id = 1
                         }
                     },
-                    StartDate = start,
-                    EndDate = end
+                    new Discount
+                    {
+                        Start = DateTime.Now,
+                        End = DateTime.Now.AddDays(365*3),
+                        PercentageDiscount = 10,
+                        Service = new ServiceModel
+                        {
+                            Id = 1
+                        }
+                    },
+                    new Discount
+                    {
+                        Start = DateTime.Now.AddDays(365),
+                        End = DateTime.Now.AddDays(365*2),
+                        PercentageDiscount = 30,
+                        Service = new ServiceModel
+                        {
+                            Id = 1
+                        }
+                    },
+                    new Discount
+                    {
+                        Start = DateTime.Now.AddDays(365*2),
+                        End = DateTime.Now.AddDays(365*3),
+                        PercentageDiscount = 40,
+                        Service = new ServiceModel
+                        {
+                            Id = 1
+                        }
+                    }
                 }
-            };
-            var expected = _services[0].Cost * _services[0].DaysAvailable.Count() * weeks;
-            var result = _sut.Calculate(input);
-            Assert.Collection(result.Calculations[0].AppliedDiscounts,
-                item => Assert.Equal(2, item.PercentageDiscount),
-                item => Assert.Equal(3, item.PercentageDiscount));
+            });
+            _sut = new CalculationService(repository);
         }
+
+        [Fact]
+        public void It_Should()
+        {
+            var result = _sut.Calculate(new CalculationRequest
+            {
+                StartDate = DateTime.Now,
+                EndDate = DateTime.Now.AddDays(7),
+                CustomerId = 1
+            });
+        }
+
     }
 }

@@ -1,10 +1,10 @@
-﻿using Models;
-using PricingCalculator.Models;
+﻿using PricingCalculator.Models;
+using PricingCalculator.Models.Calculation;
 
 namespace PricingCalculator.Calculation
 {
     public interface ICalculationService
     {
-        CalculationResponse Calculate(IEnumerable<CalculationRequest> requests);
+        decimal Calculate(CalculationRequest request);
     }
 }
